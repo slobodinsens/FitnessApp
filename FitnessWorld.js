@@ -1,208 +1,153 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Button, TextInput, StyleSheet } from 'react-native';
+import { Audio } from 'expo-av';
 
 export default function DualTimerApp() {
-    const [screenKey, setScreenKey] = useState(0); // Ключ для обновления экрана
-
+    const [screenKey, setScreenKey] = useState(0);
     return <DualTimerScreen key={screenKey} onReset={() => setScreenKey(prev => prev + 1)} />;
 }
 
 function DualTimerScreen({ onReset }) {
-    const [leftTime, setLeftTime] = useState(0);
-    const [rightTime, setRightTime] = useState(0);
+    const [leftMinutes, setLeftMinutes] = useState(0);
+    const [leftSeconds, setLeftSeconds] = useState(0);
+    const [rightMinutes, setRightMinutes] = useState(0);
+    const [rightSeconds, setRightSeconds] = useState(0);
     const [leftDelay, setLeftDelay] = useState(0);
     const [rightDelay, setRightDelay] = useState(0);
-    const [leftDelayCountdown, setLeftDelayCountdown] = useState(0);
-    const [rightDelayCountdown, setRightDelayCountdown] = useState(0);
-    const [leftDelayRunning, setLeftDelayRunning] = useState(false);
-    const [rightDelayRunning, setRightDelayRunning] = useState(false);
     const [leftRunning, setLeftRunning] = useState(false);
     const [rightRunning, setRightRunning] = useState(false);
     const [timersFinished, setTimersFinished] = useState(false);
 
+    const [sound, setSound] = useState(null);
+
+    const playSound = async (type) => {
+        const soundFile = type === 'start'
+            ? require('./assets/start.mp3')
+            : require('./assets/end.mp3');
+
+        const { sound } = await Audio.Sound.createAsync(soundFile);
+        setSound(sound);
+        await sound.playAsync();
+    };
+
+    useEffect(() => {
+        return sound ? () => { sound.unloadAsync(); } : undefined;
+    }, [sound]);
+
     const startTimers = () => {
-        if (timersFinished) return;
+        if (timersFinished || (leftMinutes === 0 && leftSeconds === 0 && rightMinutes === 0 && rightSeconds === 0)) return;
 
         setTimersFinished(false);
+        playSound('start');  // Play start sound
 
-        if (leftDelay > 0) {
-            setLeftDelayCountdown(leftDelay);
-            setLeftDelayRunning(true);
-        } else {
-            setLeftRunning(true);
+        let leftTotalTime = leftMinutes * 60 + leftSeconds;
+        let rightTotalTime = rightMinutes * 60 + rightSeconds;
+
+        if (leftTotalTime > 0) {
+            if (leftDelay > 0) {
+                setTimeout(() => setLeftRunning(true), leftDelay * 1000);
+            } else {
+                setLeftRunning(true);
+            }
         }
 
-        if (rightDelay > 0) {
-            setRightDelayCountdown(rightDelay);
-            setRightDelayRunning(true);
-        } else {
-            setRightRunning(true);
+        if (rightTotalTime > 0) {
+            if (rightDelay > 0) {
+                setTimeout(() => setRightRunning(true), rightDelay * 1000);
+            } else {
+                setRightRunning(true);
+            }
         }
     };
 
     const resetTimers = () => {
-        onReset(); // Обновление экрана
+        setLeftMinutes(0);
+        setLeftSeconds(0);
+        setRightMinutes(0);
+        setRightSeconds(0);
+        setLeftDelay(0);
+        setRightDelay(0);
+        setLeftRunning(false);
+        setRightRunning(false);
+        setTimersFinished(false);
+        onReset();
     };
 
     useEffect(() => {
-        let leftDelayInterval;
-        if (leftDelayRunning && leftDelayCountdown > 0) {
-            leftDelayInterval = setInterval(() => {
-                setLeftDelayCountdown(prev => {
-                    if (prev <= 1) {
-                        setLeftDelayRunning(false);
-                        setLeftRunning(true);
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        }
-        return () => clearInterval(leftDelayInterval);
-    }, [leftDelayRunning, leftDelayCountdown]);
-
-    useEffect(() => {
-        let rightDelayInterval;
-        if (rightDelayRunning && rightDelayCountdown > 0) {
-            rightDelayInterval = setInterval(() => {
-                setRightDelayCountdown(prev => {
-                    if (prev <= 1) {
-                        setRightDelayRunning(false);
-                        setRightRunning(true);
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        }
-        return () => clearInterval(rightDelayInterval);
-    }, [rightDelayRunning, rightDelayCountdown]);
-
-    useEffect(() => {
         let leftInterval;
-        if (leftRunning && leftTime > 0) {
+        if (leftRunning && (leftMinutes > 0 || leftSeconds > 0)) {
             leftInterval = setInterval(() => {
-                setLeftTime(prev => {
-                    if (prev <= 1) {
-                        setLeftRunning(false);
-                        if (rightTime === 0) setTimersFinished(true);
-                        return 0;
+                setLeftSeconds(prev => {
+                    if (prev === 0) {
+                        if (leftMinutes === 0) {
+                            setLeftRunning(false);
+                            if (rightMinutes === 0 && rightSeconds === 0) {
+                                setTimersFinished(true);
+                                playSound('end');  // Play end sound
+                            }
+                            return 0;
+                        }
+                        setLeftMinutes(m => m - 1);
+                        return 59;
                     }
                     return prev - 1;
                 });
             }, 1000);
         }
         return () => clearInterval(leftInterval);
-    }, [leftRunning, leftTime]);
+    }, [leftRunning, leftMinutes, leftSeconds]);
 
     useEffect(() => {
         let rightInterval;
-        if (rightRunning && rightTime > 0) {
+        if (rightRunning && (rightMinutes > 0 || rightSeconds > 0)) {
             rightInterval = setInterval(() => {
-                setRightTime(prev => {
-                    if (prev <= 1) {
-                        setRightRunning(false);
-                        setTimersFinished(true);
-                        return 0;
+                setRightSeconds(prev => {
+                    if (prev === 0) {
+                        if (rightMinutes === 0) {
+                            setRightRunning(false);
+                            setTimersFinished(true);
+                            playSound('end');  // Play end sound
+                            return 0;
+                        }
+                        setRightMinutes(m => m - 1);
+                        return 59;
                     }
                     return prev - 1;
                 });
             }, 1000);
         }
         return () => clearInterval(rightInterval);
-    }, [rightRunning, rightTime]);
+    }, [rightRunning, rightMinutes, rightSeconds]);
 
     return (
         <View style={styles.container}>
             <View style={styles.sideContainer}>
-                <Text style={styles.label}>Левая рука</Text>
-                <Text style={styles.timer}>{leftTime} сек</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="Введите время"
-                    placeholderTextColor="#888"
-                    keyboardType="numeric"
-                    onChangeText={text => setLeftTime(Number(text) || 0)}
-                    editable={!leftRunning && !rightRunning}
-                />
-                <TextInput
-                    style={styles.input}
-                    placeholder="Задержка (сек)"
-                    placeholderTextColor="#888"
-                    keyboardType="numeric"
-                    onChangeText={text => setLeftDelay(Number(text) || 0)}
-                    editable={!leftRunning && !rightRunning}
-                />
-                {leftDelayRunning && <Text style={styles.delayText}>Задержка: {leftDelayCountdown} сек</Text>}
+                <Text style={styles.label}>Left Side</Text>
+                <Text style={styles.timer}>{`${leftMinutes}:${leftSeconds < 10 ? '0' : ''}${leftSeconds}`}</Text>
+                <TextInput style={styles.input} placeholder="Minutes" keyboardType="numeric" onChangeText={text => setLeftMinutes(Number(text) || 0)} />
+                <TextInput style={styles.input} placeholder="Seconds" keyboardType="numeric" onChangeText={text => setLeftSeconds(Number(text) || 0)} />
+                <TextInput style={styles.input} placeholder="Delay (sec)" keyboardType="numeric" onChangeText={text => setLeftDelay(Number(text) || 0)} />
             </View>
             <View style={styles.controlContainer}>
-                <Button title="Старт" onPress={startTimers} color="#ff7f00" disabled={timersFinished} />
-                <Button title="Сброс" onPress={resetTimers} color="#ff0000" />
+                <Button title="Start" onPress={startTimers} color="#ff7f00" disabled={timersFinished || (leftMinutes === 0 && leftSeconds === 0 && rightMinutes === 0 && rightSeconds === 0)} />
+                <Button title="Reset" onPress={resetTimers} color="#ff0000" />
             </View>
             <View style={styles.sideContainer}>
-                <Text style={styles.label}>Правая рука</Text>
-                <Text style={styles.timer}>{rightTime} сек</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="Введите время"
-                    placeholderTextColor="#888"
-                    keyboardType="numeric"
-                    onChangeText={text => setRightTime(Number(text) || 0)}
-                    editable={!leftRunning && !rightRunning}
-                />
-                <TextInput
-                    style={styles.input}
-                    placeholder="Задержка (сек)"
-                    placeholderTextColor="#888"
-                    keyboardType="numeric"
-                    onChangeText={text => setRightDelay(Number(text) || 0)}
-                    editable={!leftRunning && !rightRunning}
-                />
-                {rightDelayRunning && <Text style={styles.delayText}>Задержка: {rightDelayCountdown} сек</Text>}
+                <Text style={styles.label}>Right Side</Text>
+                <Text style={styles.timer}>{`${rightMinutes}:${rightSeconds < 10 ? '0' : ''}${rightSeconds}`}</Text>
+                <TextInput style={styles.input} placeholder="Minutes" keyboardType="numeric" onChangeText={text => setRightMinutes(Number(text) || 0)} />
+                <TextInput style={styles.input} placeholder="Seconds" keyboardType="numeric" onChangeText={text => setRightSeconds(Number(text) || 0)} />
+                <TextInput style={styles.input} placeholder="Delay (sec)" keyboardType="numeric" onChangeText={text => setRightDelay(Number(text) || 0)} />
             </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: 'black',
-        padding: 20,
-    },
-    sideContainer: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    controlContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    label: {
-        fontSize: 24,
-        color: 'white',
-        marginBottom: 10,
-    },
-    timer: {
-        fontSize: 32,
-        color: '#ff7f00',
-        fontWeight: 'bold',
-    },
-    delayText: {
-        fontSize: 20,
-        color: 'yellow',
-        marginVertical: 5,
-    },
-    input: {
-        width: 100,
-        height: 40,
-        borderBottomWidth: 1,
-        borderBottomColor: '#ff7f00',
-        color: 'white',
-        textAlign: 'center',
-        marginTop: 10,
-    },
+    container: { flex: 1, flexDirection: 'row', backgroundColor: 'black', padding: 20 },
+    sideContainer: { flex: 1, alignItems: 'center' },
+    controlContainer: { alignItems: 'center' },
+    label: { fontSize: 24, color: 'white' },
+    timer: { fontSize: 50, color: '#ff7f00', fontWeight: 'bold' }, // Increased size
+    input: { width: 100, height: 40, borderBottomWidth: 1, borderBottomColor: '#ff7f00', color: 'white', textAlign: 'center', marginTop: 10 },
 });
