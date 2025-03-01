@@ -17,28 +17,50 @@ function DualTimerScreen({ onReset }) {
     const [leftRunning, setLeftRunning] = useState(false);
     const [rightRunning, setRightRunning] = useState(false);
     const [timersFinished, setTimersFinished] = useState(false);
-
     const [sound, setSound] = useState(null);
+    const [isPlaying, setIsPlaying] = useState(false);
 
-    const playSound = async (type) => {
-        const soundFile = type === 'start'
-            ? require('./assets/start.mp3')
-            : require('./assets/end.mp3');
+    // ✅ Play Sound with your working logic
+    async function playSound(type) {
+        try {
+            const soundFile = type === 'start'
+                ? require('./assets/start.wav')  // Use WAV, OGG, FLAC, or M4A
+                : require('./assets/end.wav');
 
-        const { sound } = await Audio.Sound.createAsync(soundFile);
-        setSound(sound);
-        await sound.playAsync();
-    };
+            if (sound === null) {
+                // Load and play the sound for the first time
+                const { sound: playbackObject } = await Audio.Sound.createAsync(soundFile);
+                setSound(playbackObject);
+                await playbackObject.playAsync();  // Start sound
+                setIsPlaying(true);
 
-    useEffect(() => {
-        return sound ? () => { sound.unloadAsync(); } : undefined;
-    }, [sound]);
+                // ✅ Wait for the sound to finish before starting timers
+                await new Promise(resolve => playbackObject.setOnPlaybackStatusUpdate(status => {
+                    if (status.didJustFinish) resolve();
+                }));
+            } else {
+                const status = await sound.getStatusAsync();
+                if (status.positionMillis === status.durationMillis) {
+                    await sound.setPositionAsync(0);
+                    await sound.playAsync();
+                    setIsPlaying(true);
+                } else {
+                    await sound.playAsync();
+                    setIsPlaying(true);
+                }
+            }
+        } catch (error) {
+            console.log('Error playing sound:', error);
+        }
+    }
 
-    const startTimers = () => {
+    const startTimers = async () => {
         if (timersFinished || (leftMinutes === 0 && leftSeconds === 0 && rightMinutes === 0 && rightSeconds === 0)) return;
 
         setTimersFinished(false);
-        playSound('start');  // Play start sound
+
+        // ✅ Play start sound BEFORE running timers
+        await playSound('start');
 
         let leftTotalTime = leftMinutes * 60 + leftSeconds;
         let rightTotalTime = rightMinutes * 60 + rightSeconds;
@@ -83,7 +105,7 @@ function DualTimerScreen({ onReset }) {
                             setLeftRunning(false);
                             if (rightMinutes === 0 && rightSeconds === 0) {
                                 setTimersFinished(true);
-                                playSound('end');  // Play end sound
+                                playSound('end');  // ✅ Play end sound
                             }
                             return 0;
                         }
@@ -106,7 +128,7 @@ function DualTimerScreen({ onReset }) {
                         if (rightMinutes === 0) {
                             setRightRunning(false);
                             setTimersFinished(true);
-                            playSound('end');  // Play end sound
+                            playSound('end');  // ✅ Play end sound
                             return 0;
                         }
                         setRightMinutes(m => m - 1);
