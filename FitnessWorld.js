@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, TextInput, StyleSheet } from 'react-native';
-import { Audio } from 'expo-av';
+import { View, Text, Button, TextInput, StyleSheet, Dimensions } from 'react-native';
+import { Video } from 'expo-av';
 
 export default function DualTimerApp() {
     const [screenKey, setScreenKey] = useState(0);
@@ -16,97 +16,36 @@ function DualTimerScreen({ onReset }) {
     const [rightDelay, setRightDelay] = useState(0);
     const [leftRunning, setLeftRunning] = useState(false);
     const [rightRunning, setRightRunning] = useState(false);
-    const [timersFinished, setTimersFinished] = useState(false);
-    const [sound, setSound] = useState(null);
-    const [isPlaying, setIsPlaying] = useState(false);
+    const [videoPlaying, setVideoPlaying] = useState(false);
+    const [videoFinished, setVideoFinished] = useState(false);
 
-    // ✅ Play Sound with your working logic
-    async function playSound(type) {
-        try {
-            const soundFile = type === 'start'
-                ? require('./assets/start.wav')  // Use WAV, OGG, FLAC, or M4A
-                : require('./assets/end.wav');
-
-            if (sound === null) {
-                // Load and play the sound for the first time
-                const { sound: playbackObject } = await Audio.Sound.createAsync(soundFile);
-                setSound(playbackObject);
-                await playbackObject.playAsync();  // Start sound
-                setIsPlaying(true);
-
-                // ✅ Wait for the sound to finish before starting timers
-                await new Promise(resolve => playbackObject.setOnPlaybackStatusUpdate(status => {
-                    if (status.didJustFinish) resolve();
-                }));
-            } else {
-                const status = await sound.getStatusAsync();
-                if (status.positionMillis === status.durationMillis) {
-                    await sound.setPositionAsync(0);
-                    await sound.playAsync();
-                    setIsPlaying(true);
-                } else {
-                    await sound.playAsync();
-                    setIsPlaying(true);
-                }
-            }
-        } catch (error) {
-            console.log('Error playing sound:', error);
-        }
-    }
-
-    const startTimers = async () => {
-        if (timersFinished || (leftMinutes === 0 && leftSeconds === 0 && rightMinutes === 0 && rightSeconds === 0)) return;
-
-        setTimersFinished(false);
-
-        // ✅ Play start sound BEFORE running timers
-        await playSound('start');
-
-        let leftTotalTime = leftMinutes * 60 + leftSeconds;
-        let rightTotalTime = rightMinutes * 60 + rightSeconds;
-
-        if (leftTotalTime > 0) {
-            if (leftDelay > 0) {
-                setTimeout(() => setLeftRunning(true), leftDelay * 1000);
-            } else {
-                setLeftRunning(true);
-            }
-        }
-
-        if (rightTotalTime > 0) {
-            if (rightDelay > 0) {
-                setTimeout(() => setRightRunning(true), rightDelay * 1000);
-            } else {
-                setRightRunning(true);
-            }
-        }
+    const startTimers = () => {
+        if (leftMinutes === 0 && leftSeconds === 0 && rightMinutes === 0 && rightSeconds === 0) return;
+        setVideoPlaying(true);
+        setVideoFinished(false);
     };
 
-    const resetTimers = () => {
-        setLeftMinutes(0);
-        setLeftSeconds(0);
-        setRightMinutes(0);
-        setRightSeconds(0);
-        setLeftDelay(0);
-        setRightDelay(0);
-        setLeftRunning(false);
-        setRightRunning(false);
-        setTimersFinished(false);
-        onReset();
+    const handleVideoFinish = () => {
+        setVideoPlaying(false);
+        setVideoFinished(true);
+
+        if (leftMinutes > 0 || leftSeconds > 0) {
+            setTimeout(() => setLeftRunning(true), leftDelay * 1000);
+        }
+
+        if (rightMinutes > 0 || rightSeconds > 0) {
+            setTimeout(() => setRightRunning(true), rightDelay * 1000);
+        }
     };
 
     useEffect(() => {
         let leftInterval;
-        if (leftRunning && (leftMinutes > 0 || leftSeconds > 0)) {
+        if (leftRunning) {
             leftInterval = setInterval(() => {
                 setLeftSeconds(prev => {
                     if (prev === 0) {
                         if (leftMinutes === 0) {
                             setLeftRunning(false);
-                            if (rightMinutes === 0 && rightSeconds === 0) {
-                                setTimersFinished(true);
-                                playSound('end');  // ✅ Play end sound
-                            }
                             return 0;
                         }
                         setLeftMinutes(m => m - 1);
@@ -121,14 +60,12 @@ function DualTimerScreen({ onReset }) {
 
     useEffect(() => {
         let rightInterval;
-        if (rightRunning && (rightMinutes > 0 || rightSeconds > 0)) {
+        if (rightRunning) {
             rightInterval = setInterval(() => {
                 setRightSeconds(prev => {
                     if (prev === 0) {
                         if (rightMinutes === 0) {
                             setRightRunning(false);
-                            setTimersFinished(true);
-                            playSound('end');  // ✅ Play end sound
                             return 0;
                         }
                         setRightMinutes(m => m - 1);
@@ -151,8 +88,21 @@ function DualTimerScreen({ onReset }) {
                 <TextInput style={styles.input} placeholder="Delay (sec)" keyboardType="numeric" onChangeText={text => setLeftDelay(Number(text) || 0)} />
             </View>
             <View style={styles.controlContainer}>
-                <Button title="Start" onPress={startTimers} color="#ff7f00" disabled={timersFinished || (leftMinutes === 0 && leftSeconds === 0 && rightMinutes === 0 && rightSeconds === 0)} />
-                <Button title="Reset" onPress={resetTimers} color="#ff0000" />
+                <Button title="Start" onPress={startTimers} color="#ff7f00" />
+                <Button title="Reset" onPress={onReset} color="#ff0000" />
+                {videoPlaying && (
+                    <View style={styles.videoContainer}>
+                        <Video
+                            source={require('./assets/video.mp4')}
+                            style={styles.video}
+                            shouldPlay
+                            resizeMode="contain"
+                            onPlaybackStatusUpdate={status => {
+                                if (status.didJustFinish) handleVideoFinish();
+                            }}
+                        />
+                    </View>
+                )}
             </View>
             <View style={styles.sideContainer}>
                 <Text style={styles.label}>Right Side</Text>
@@ -168,8 +118,10 @@ function DualTimerScreen({ onReset }) {
 const styles = StyleSheet.create({
     container: { flex: 1, flexDirection: 'row', backgroundColor: 'black', padding: 20 },
     sideContainer: { flex: 1, alignItems: 'center' },
-    controlContainer: { alignItems: 'center' },
+    controlContainer: { alignItems: 'center', justifyContent: 'center', flex: 1, marginTop: 20 },
     label: { fontSize: 24, color: 'white' },
-    timer: { fontSize: 50, color: '#ff7f00', fontWeight: 'bold' }, // Increased size
+    timer: { fontSize: 50, color: '#ff7f00', fontWeight: 'bold' },
     input: { width: 100, height: 40, borderBottomWidth: 1, borderBottomColor: '#ff7f00', color: 'white', textAlign: 'center', marginTop: 10 },
+    videoContainer: { marginTop: 20, alignItems: 'center', width: 300, height: 300 },
+    video: { width: '100%', height: '100%' },
 });
