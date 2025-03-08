@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, TextInput, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, Button, TextInput, StyleSheet, Dimensions, TouchableOpacity, Alert } from 'react-native';
 import { Video } from 'expo-av';
 
 export default function DualTimerApp() {
@@ -20,7 +20,10 @@ function DualTimerScreen({ onReset }) {
     const [videoFinished, setVideoFinished] = useState(false);
 
     const startTimers = () => {
-        if (leftMinutes === 0 && leftSeconds === 0 && rightMinutes === 0 && rightSeconds === 0) return;
+        if (leftMinutes === 0 && leftSeconds === 0 && rightMinutes === 0 && rightSeconds === 0) {
+            Alert.alert("Warning", "Insert time first", [{ text: "OK" }]);
+            return;
+        }
         setVideoPlaying(true);
         setVideoFinished(false);
     };
@@ -30,13 +33,53 @@ function DualTimerScreen({ onReset }) {
         setVideoFinished(true);
 
         if (leftMinutes > 0 || leftSeconds > 0) {
-            setTimeout(() => setLeftRunning(true), leftDelay * 1000);
+            setLeftRunning(true);
         }
 
         if (rightMinutes > 0 || rightSeconds > 0) {
-            setTimeout(() => setRightRunning(true), rightDelay * 1000);
+            setRightRunning(true);
         }
     };
+
+    useEffect(() => {
+        let leftInterval;
+        if (leftRunning && (leftMinutes > 0 || leftSeconds > 0)) {
+            leftInterval = setInterval(() => {
+                setLeftSeconds(prev => {
+                    if (prev === 0) {
+                        if (leftMinutes === 0) {
+                            setLeftRunning(false);
+                            return 0;
+                        }
+                        setLeftMinutes(m => m - 1);
+                        return 59;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        }
+        return () => clearInterval(leftInterval);
+    }, [leftRunning, leftMinutes, leftSeconds]);
+
+    useEffect(() => {
+        let rightInterval;
+        if (rightRunning && (rightMinutes > 0 || rightSeconds > 0)) {
+            rightInterval = setInterval(() => {
+                setRightSeconds(prev => {
+                    if (prev === 0) {
+                        if (rightMinutes === 0) {
+                            setRightRunning(false);
+                            return 0;
+                        }
+                        setRightMinutes(m => m - 1);
+                        return 59;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        }
+        return () => clearInterval(rightInterval);
+    }, [rightRunning, rightMinutes, rightSeconds]);
 
     return (
         <View style={styles.container}>
