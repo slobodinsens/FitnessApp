@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, TextInput, StyleSheet, Dimensions, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Video } from 'expo-av';
 
 export default function DualTimerApp() {
@@ -8,90 +8,78 @@ export default function DualTimerApp() {
 }
 
 function DualTimerScreen({ onReset }) {
-    const [leftMinutes, setLeftMinutes] = useState(0);
-    const [leftSeconds, setLeftSeconds] = useState(0);
-    const [rightMinutes, setRightMinutes] = useState(0);
-    const [rightSeconds, setRightSeconds] = useState(0);
-    const [leftDelay, setLeftDelay] = useState(0);
-    const [rightDelay, setRightDelay] = useState(0);
-    const [leftRunning, setLeftRunning] = useState(false);
-    const [rightRunning, setRightRunning] = useState(false);
+    const [leftMinutes, setLeftMinutes] = useState('');
+    const [leftSeconds, setLeftSeconds] = useState('');
+    const [rightMinutes, setRightMinutes] = useState('');
+    const [rightSeconds, setRightSeconds] = useState('');
+    const [leftDelay, setLeftDelay] = useState('');
+    const [rightDelay, setRightDelay] = useState('');
     const [videoPlaying, setVideoPlaying] = useState(false);
-    const [videoFinished, setVideoFinished] = useState(false);
+    const [timersRunning, setTimersRunning] = useState(false);
+    const [timerCompleted, setTimerCompleted] = useState(false);
+
+    const isStartDisabled = !leftMinutes && !leftSeconds && !rightMinutes && !rightSeconds ? true : false;
 
     const startTimers = () => {
-        if (leftMinutes === 0 && leftSeconds === 0 && rightMinutes === 0 && rightSeconds === 0) {
+        if (isStartDisabled) {
             Alert.alert("Warning", "Insert time first", [{ text: "OK" }]);
             return;
         }
         setVideoPlaying(true);
-        setVideoFinished(false);
+        setTimerCompleted(false);
     };
 
     const handleVideoFinish = () => {
         setVideoPlaying(false);
-        setVideoFinished(true);
-
-        if (leftMinutes > 0 || leftSeconds > 0) {
-            setLeftRunning(true);
-        }
-
-        if (rightMinutes > 0 || rightSeconds > 0) {
-            setRightRunning(true);
-        }
+        setTimersRunning(true);
     };
 
     useEffect(() => {
-        let leftInterval;
-        if (leftRunning && (leftMinutes > 0 || leftSeconds > 0)) {
-            leftInterval = setInterval(() => {
+        let timerInterval;
+        if (timersRunning) {
+            timerInterval = setInterval(() => {
                 setLeftSeconds(prev => {
-                    if (prev === 0) {
-                        if (leftMinutes === 0) {
-                            setLeftRunning(false);
-                            return 0;
-                        }
+                    if (prev === 0 || prev === '') {
+                        if (leftMinutes === 0 || leftMinutes === '') return '';
                         setLeftMinutes(m => m - 1);
                         return 59;
                     }
                     return prev - 1;
                 });
-            }, 1000);
-        }
-        return () => clearInterval(leftInterval);
-    }, [leftRunning, leftMinutes, leftSeconds]);
-
-    useEffect(() => {
-        let rightInterval;
-        if (rightRunning && (rightMinutes > 0 || rightSeconds > 0)) {
-            rightInterval = setInterval(() => {
                 setRightSeconds(prev => {
-                    if (prev === 0) {
-                        if (rightMinutes === 0) {
-                            setRightRunning(false);
-                            return 0;
-                        }
+                    if (prev === 0 || prev === '') {
+                        if (rightMinutes === 0 || rightMinutes === '') return '';
                         setRightMinutes(m => m - 1);
                         return 59;
                     }
                     return prev - 1;
                 });
+                if (!leftMinutes && !leftSeconds && !rightMinutes && !rightSeconds) {
+                    clearInterval(timerInterval);
+                    setTimersRunning(false);
+                    setTimerCompleted(true);
+                }
             }, 1000);
         }
-        return () => clearInterval(rightInterval);
-    }, [rightRunning, rightMinutes, rightSeconds]);
+        return () => clearInterval(timerInterval);
+    }, [timersRunning, leftMinutes, leftSeconds, rightMinutes, rightSeconds]);
 
     return (
         <View style={styles.container}>
             <View style={styles.sideContainer}>
                 <Text style={styles.label}>Left Side</Text>
-                <Text style={styles.timer}>{`${leftMinutes}:${leftSeconds < 10 ? '0' : ''}${leftSeconds}`}</Text>
-                <TextInput style={styles.input} placeholder="Minutes" keyboardType="numeric" onChangeText={text => setLeftMinutes(Number(text) || 0)} />
-                <TextInput style={styles.input} placeholder="Seconds" keyboardType="numeric" onChangeText={text => setLeftSeconds(Number(text) || 0)} />
-                <TextInput style={styles.input} placeholder="Delay (sec)" keyboardType="numeric" onChangeText={text => setLeftDelay(Number(text) || 0)} />
+                <Text style={styles.timer}>{`${leftMinutes || 0}:${leftSeconds < 10 ? '0' : ''}${leftSeconds || 0}`}</Text>
+                <TextInput style={styles.input} placeholder="Minutes" keyboardType="numeric" onChangeText={text => setLeftMinutes(text)} />
+                <TextInput style={styles.input} placeholder="Seconds" keyboardType="numeric" onChangeText={text => setLeftSeconds(text)} />
+                <TextInput style={styles.input} placeholder="Delay (sec)" keyboardType="numeric" onChangeText={text => setLeftDelay(text)} />
             </View>
             <View style={styles.controlContainer}>
-                <TouchableOpacity onPress={startTimers} style={styles.startButton}><Text style={styles.buttonText}>Start</Text></TouchableOpacity>
+                <TouchableOpacity
+                    onPress={startTimers}
+                    style={[styles.startButton, isStartDisabled ? styles.disabledButton : null]}
+                    disabled={isStartDisabled}>
+                    <Text style={styles.buttonText}>Start</Text>
+                </TouchableOpacity>
                 <TouchableOpacity onPress={onReset} style={styles.resetButton}><Text style={styles.buttonText}>Reset</Text></TouchableOpacity>
                 {videoPlaying && (
                     <View style={styles.videoContainer}>
@@ -109,10 +97,10 @@ function DualTimerScreen({ onReset }) {
             </View>
             <View style={styles.sideContainer}>
                 <Text style={styles.label}>Right Side</Text>
-                <Text style={styles.timer}>{`${rightMinutes}:${rightSeconds < 10 ? '0' : ''}${rightSeconds}`}</Text>
-                <TextInput style={styles.input} placeholder="Minutes" keyboardType="numeric" onChangeText={text => setRightMinutes(Number(text) || 0)} />
-                <TextInput style={styles.input} placeholder="Seconds" keyboardType="numeric" onChangeText={text => setRightSeconds(Number(text) || 0)} />
-                <TextInput style={styles.input} placeholder="Delay (sec)" keyboardType="numeric" onChangeText={text => setRightDelay(Number(text) || 0)} />
+                <Text style={styles.timer}>{`${rightMinutes || 0}:${rightSeconds < 10 ? '0' : ''}${rightSeconds || 0}`}</Text>
+                <TextInput style={styles.input} placeholder="Minutes" keyboardType="numeric" onChangeText={text => setRightMinutes(text)} />
+                <TextInput style={styles.input} placeholder="Seconds" keyboardType="numeric" onChangeText={text => setRightSeconds(text)} />
+                <TextInput style={styles.input} placeholder="Delay (sec)" keyboardType="numeric" onChangeText={text => setRightDelay(text)} />
             </View>
         </View>
     );
@@ -129,5 +117,6 @@ const styles = StyleSheet.create({
     video: { width: '100%', height: '100%' },
     startButton: { backgroundColor: 'green', padding: 15, margin: 10, borderRadius: 10, alignItems: 'center', width: 150 },
     resetButton: { backgroundColor: 'red', padding: 15, margin: 10, borderRadius: 10, alignItems: 'center', width: 150 },
+    disabledButton: { backgroundColor: 'gray' },
     buttonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
 });
