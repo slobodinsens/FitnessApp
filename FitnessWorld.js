@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, TextInput, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, Button, TextInput, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { Video } from 'expo-av';
 
 export default function DualTimerApp() {
@@ -38,46 +38,6 @@ function DualTimerScreen({ onReset }) {
         }
     };
 
-    useEffect(() => {
-        let leftInterval;
-        if (leftRunning) {
-            leftInterval = setInterval(() => {
-                setLeftSeconds(prev => {
-                    if (prev === 0) {
-                        if (leftMinutes === 0) {
-                            setLeftRunning(false);
-                            return 0;
-                        }
-                        setLeftMinutes(m => m - 1);
-                        return 59;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        }
-        return () => clearInterval(leftInterval);
-    }, [leftRunning, leftMinutes, leftSeconds]);
-
-    useEffect(() => {
-        let rightInterval;
-        if (rightRunning) {
-            rightInterval = setInterval(() => {
-                setRightSeconds(prev => {
-                    if (prev === 0) {
-                        if (rightMinutes === 0) {
-                            setRightRunning(false);
-                            return 0;
-                        }
-                        setRightMinutes(m => m - 1);
-                        return 59;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        }
-        return () => clearInterval(rightInterval);
-    }, [rightRunning, rightMinutes, rightSeconds]);
-
     return (
         <View style={styles.container}>
             <View style={styles.sideContainer}>
@@ -88,8 +48,8 @@ function DualTimerScreen({ onReset }) {
                 <TextInput style={styles.input} placeholder="Delay (sec)" keyboardType="numeric" onChangeText={text => setLeftDelay(Number(text) || 0)} />
             </View>
             <View style={styles.controlContainer}>
-                <Button title="Start" onPress={startTimers} color="#ff7f00" />
-                <Button title="Reset" onPress={onReset} color="#ff0000" />
+                <TouchableOpacity onPress={startTimers} style={styles.startButton}><Text style={styles.buttonText}>Start</Text></TouchableOpacity>
+                <TouchableOpacity onPress={onReset} style={styles.resetButton}><Text style={styles.buttonText}>Reset</Text></TouchableOpacity>
                 {videoPlaying && (
                     <View style={styles.videoContainer}>
                         <Video
@@ -124,4 +84,7 @@ const styles = StyleSheet.create({
     input: { width: 100, height: 40, borderBottomWidth: 1, borderBottomColor: '#ff7f00', color: 'white', textAlign: 'center', marginTop: 10 },
     videoContainer: { marginTop: 20, alignItems: 'center', width: 300, height: 300 },
     video: { width: '100%', height: '100%' },
+    startButton: { backgroundColor: 'green', padding: 15, margin: 10, borderRadius: 10, alignItems: 'center', width: 150 },
+    resetButton: { backgroundColor: 'red', padding: 15, margin: 10, borderRadius: 10, alignItems: 'center', width: 150 },
+    buttonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
 });
